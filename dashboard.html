@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart AC - Control & History</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; text-align: center; margin: 0; padding: 20px; }
+    .card { background: #1e293b; max-width: 480px; margin: auto; padding: 25px; border-radius: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+    .status-badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: bold; background: #ef4444; margin-bottom: 10px; }
+    .sensor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
+    .sensor-card { background: #0f172a; padding: 15px; border-radius: 16px; }
+    .val { font-size: 28px; font-weight: 700; color: #38bdf8; }
+    .lbl { font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; }
+    .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+    .btn-on { background: #22c55e; color: white; }
+    .btn-off { background: #ef4444; color: white; }
+    .btn-mode { background: #f59e0b; color: white; }
+    .temp-ctrl { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 15px 0; }
+    .btn-circle { width: 50px; height: 50px; border-radius: 50%; border: none; background: #334155; color: white; font-size: 24px; cursor: pointer; }
+    .chart-container { background: #0f172a; padding: 15px; border-radius: 16px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="status" class="status-badge">Menghubungkan...</div>
+    <h2>Smart AC Remote</h2>
+
+    <div class="sensor-grid">
+      <div class="sensor-card">
+        <div class="lbl">Suhu Realtime</div>
+        <span class="val" id="temp">--</span> °C
+      </div>
+      <div class="sensor-card">
+        <div class="lbl">Kelembapan</div>
+        <span class="val" id="hum">--</span> %
+      </div>
+    </div>
+
+    <p>Mode: <b id="mode-text" style="color:#38bdf8">--</b></p>
+    <button class="btn btn-mode" onclick="sendCmd('TOGGLE_AUTO')">Ganti Auto / Manual</button>
+
+    <div class="temp-ctrl">
+      <button class="btn-circle" onclick="changeTemp(-1)">-</button>
+      <span style="font-size:36px; font-weight:bold; width:60px;" id="target-temp">24</span>°C
+      <button class="btn-circle" onclick="changeTemp(1)">+</button>
+    </div>
+
+    <button class="btn btn-on" onclick="sendCmd('ON')">NYALAKAN AC</button>
+    <button class="btn btn-off" onclick="sendCmd('OFF')">MATIKAN AC</button>
+
+    <!-- GRAFIK RIWAYAT 30 HARI -->
+    <div class="chart-container">
+      <div class="lbl" style="margin-bottom:10px;">Riwayat Suhu (30 Hari Terakhir)</div>
+      <canvas id="historyChart"></canvas>
+    </div>
+  </div>
+
+<script>
+  let targetTemp = 24;
+  const TOPIC_PREFIX = "kamar_saya_99";
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzlayNGFPBlf-QwivX-EkjMRnxnkz002XtVbgf4sJ2_g3gBGBT0n1_q5QgQb59HfbUleQ/exec";
+
+  // 1. MQTT Client (Realtime Remote)
+  const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+  client.on('connect', () => {
+    document.getElementById('status').innerText = 'Terhubung (Cloud)';
+    document.getElementById('status').style.background = '#22c55e';
+    client.subscribe(TOPIC_PREFIX + '/ac/suhu');
+    client.subscribe(TOPIC_PREFIX + '/ac/kelembapan');
+    client.subscribe(TOPIC_PREFIX + '/ac/mode');
+  });
+
+  client.on('message', (topic, message) => {
+    const val = message.toString();
+    if (topic === TOPIC_PREFIX + '/ac/suhu') document.getElementById('temp').innerText = val;
+    if (topic === TOPIC_PREFIX + '/ac/kelembapan') document.getElementById('hum').innerText = val;
+    if (topic === TOPIC_PREFIX + '/ac/mode') document.getElementById('mode-text').innerText = val;
+  });
+
+  function sendCmd(cmd) { client.publish(TOPIC_PREFIX + '/ac/command', cmd); }
+  function changeTemp(delta) {
+    targetTemp += delta;
+    if(targetTemp < 16) targetTemp = 16;
+    if(targetTemp > 30) targetTemp = 30;
+    document.getElementById('target-temp').innerText = targetTemp;
+    client.publish(TOPIC_PREFIX + '/ac/target_suhu', targetTemp.toString());
+  }
+
+  // 2. Load History dari Google Sheets
+  async function loadHistoryChart() {
+    try {
+      const res = await fetch(GOOGLE_SCRIPT_URL + "?action=read");
+      const data = await res.json();
+
+      const labels = data.map(item => item.timestamp);
+      const temps = data.map(item => item.temp);
+
+      const ctx = document.getElementById('historyChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Suhu (°C)',
+            data: temps,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { ticks: { color: '#94a3b8', maxRotation: 45 } },
+            y: { ticks: { color: '#94a3b8' } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    } catch (e) {
+      console.error("Gagal memuat riwayat grafik:", e);
+    }
+  }
+
+  loadHistoryChart();
+</script>
+</body>
+</html>
