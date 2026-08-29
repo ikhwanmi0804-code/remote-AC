@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Air Conditioning Dashboard</title>
+  <!-- Library MQTT & Chart.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -72,7 +73,7 @@
 <body>
 
   <div class="dashboard">
-    <div style="text-align: center;"><span id="mqttStatus" class="status-badge">DISCONNECTED</span></div>
+    <div style="text-align: center;"><span id="mqttStatus" class="status-badge">CONNECTING...</span></div>
 
     <!-- Mode System -->
     <div class="card mode-card">
@@ -250,18 +251,22 @@
     };
 
     const fanLabels = ["Low", "Med", "High", "Max"];
-
     let chartDataToday = { labels: [], temp: [], amp: [] };
     let chartData30Days = { labels: [], temp: [], amp: [] };
 
-    // --- MQTT EMQX ---
+    // --- KONEKSI MQTT VIA WEBSOCKET (EMQX) ---
     const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
     client.on('connect', () => {
+      console.log("MQTT Connected!");
       const statusElem = document.getElementById('mqttStatus');
       statusElem.innerText = "CONNECTED (EMQX)";
       statusElem.style.background = "#10b981";
       client.subscribe(TOPIC_PREFIX + '/ac/#');
+    });
+
+    client.on('error', (err) => {
+      console.error("MQTT Error: ", err);
     });
 
     client.on('message', (topic, message) => {
@@ -352,6 +357,7 @@
     }
 
     function updateChartData(newData) {
+      if(!chartInstance) return;
       chartInstance.data.labels = newData.labels;
       chartInstance.data.datasets[0].data = newData.temp;
       chartInstance.data.datasets[1].data = newData.amp;
@@ -433,7 +439,7 @@
       const statusAmp = document.getElementById(`statusAmp${unit}`);
       const uStateText = document.getElementById(`u${unit}StateText`);
       
-      consst btnOn = document.getElementById(`u${unit}BtnOn`);
+      const btnOn = document.getElementById(`u${unit}BtnOn`);
       const btnOff = document.getElementById(`u${unit}BtnOff`);
 
       if (isTurnOn) {
@@ -454,7 +460,7 @@
         uStateText.innerHTML = 'OFF · 0.0 A';
 
         btnOff.classList.add('pressed');
-        btnOn.classList.pressed = true;
+        btnOn.classList.remove('pressed');
       }
 
       const activeCount = (state.unit1.active ? 1 : 0) + (state.unit2.active ? 1 : 0);
