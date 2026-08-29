@@ -3,132 +3,465 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart AC - Control & History</title>
+  <title>Air Conditioning Dashboard</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: #0f172a; color: #f8fafc; text-align: center; margin: 0; padding: 20px; }
-    .card { background: #1e293b; max-width: 480px; margin: auto; padding: 25px; border-radius: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
-    .status-badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: bold; background: #ef4444; margin-bottom: 10px; }
-    .sensor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
-    .sensor-card { background: #0f172a; padding: 15px; border-radius: 16px; }
-    .val { font-size: 28px; font-weight: 700; color: #38bdf8; }
-    .lbl { font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; }
-    .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
-    .btn-on { background: #22c55e; color: white; }
-    .btn-off { background: #ef4444; color: white; }
-    .btn-mode { background: #f59e0b; color: white; }
-    .temp-ctrl { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 15px 0; }
-    .btn-circle { width: 50px; height: 50px; border-radius: 50%; border: none; background: #334155; color: white; font-size: 24px; cursor: pointer; }
-    .chart-container { background: #0f172a; padding: 15px; border-radius: 16px; margin-top: 20px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
+    body { background-color: #0b0e14; color: #ffffff; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+    .dashboard { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; }
+    .card { background-color: #121824; border: 1px solid #1a2333; border-radius: 20px; padding: 20px; }
+    .label-sm { font-size: 0.65rem; letter-spacing: 1.5px; color: #5a6e85; text-transform: uppercase; font-weight: 700; }
+    .mode-card { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; }
+    .mode-toggle { display: flex; background-color: #0b0e14; padding: 4px; border-radius: 12px; border: 1px solid #1a2333; gap: 4px; }
+    .mode-btn { background: none; border: none; color: #5a6e85; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    .mode-btn.active { background-color: #26e6a3; color: #0b0e14; }
+    .chart-card { display: flex; flex-direction: column; gap: 14px; }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; }
+    .chart-controls { display: flex; align-items: center; gap: 8px; }
+    .chart-tabs { display: flex; gap: 4px; background-color: #0b0e14; padding: 3px; border-radius: 8px; border: 1px solid #1a2333; }
+    .tab-btn { background: none; border: none; color: #5a6e85; padding: 4px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    .tab-btn.active { background-color: #1e2838; color: #26e6a3; }
+    .btn-download { background-color: rgba(38, 230, 163, 0.1); border: 1px solid rgba(38, 230, 163, 0.3); color: #26e6a3; padding: 5px 10px; border-radius: 8px; font-size: 0.65rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease; }
+    .btn-download:hover { background-color: #26e6a3; color: #0b0e14; }
+    .chart-container { position: relative; width: 100%; height: 180px; }
+    .room-temp-card { text-align: center; padding: 24px 20px; }
+    .temp-val-main { font-size: 3.2rem; font-weight: 800; color: #26e6a3; margin: 8px 0; letter-spacing: -1px; }
+    .temp-range { display: flex; justify-content: space-between; color: #3b4d61; font-size: 0.75rem; font-weight: 600; }
+    .humidity-card .humidity-val { font-size: 2rem; font-weight: 700; margin: 12px 0; }
+    .progress-bar { width: 100%; height: 4px; background-color: #1a2436; border-radius: 2px; overflow: hidden; }
+    .progress-fill { width: 0%; height: 100%; background-color: #3b82f6; transition: width 0.5s ease; }
+    .status-card { display: flex; flex-direction: column; gap: 12px; }
+    .status-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 600; }
+    .status-info { display: flex; align-items: center; gap: 8px; }
+    .dot-led { width: 6px; height: 6px; border-radius: 50%; transition: all 0.3s ease; }
+    .dot-led.active { background-color: #26e6a3; box-shadow: 0 0 6px #26e6a3; }
+    .dot-led.off { background-color: #3b4d61; box-shadow: none; }
+    .amps-green { color: #26e6a3; }
+    .amps-off { color: #3b4d61; }
+    .section-header { font-size: 0.7rem; letter-spacing: 1.5px; color: #5a6e85; font-weight: 700; margin-top: 8px; margin-bottom: -4px; }
+    .ac-card { display: flex; flex-direction: column; gap: 16px; border: 1px solid #1e2838; transition: all 0.3s ease; }
+    .ac-card.unit-off { opacity: 0.5; }
+    .ac-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .ac-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+    .ac-sub { font-size: 0.7rem; color: #5a6e85; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+    .power-btn-container { display: flex; gap: 8px; }
+    .push-btn { background-color: #182030; border: 1px solid #232f45; color: #5a6e85; padding: 6px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 800; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    .push-btn:active { transform: translateY(1px); }
+    .push-btn-on.pressed { background-color: #26e6a3; border-color: #26e6a3; color: #0b0e14; box-shadow: 0 0 10px rgba(38, 230, 163, 0.4); }
+    .push-btn-off.pressed { background-color: #f43f5e; border-color: #f43f5e; color: #ffffff; box-shadow: 0 0 10px rgba(244, 63, 94, 0.4); }
+    .temp-control-row { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+    .temp-box { text-align: center; flex: 1; }
+    .temp-val { font-size: 2.2rem; font-weight: 700; margin-top: 4px; }
+    .arrow { color: #3b4d61; font-size: 1.2rem; }
+    .target-control { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .btn-step { background: #182030; border: 1px solid #232f45; color: white; width: 32px; height: 32px; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .target-green { color: #26e6a3; }
+    .fan-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .fan-bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; align-items: flex-end; height: 36px; }
+    .bar { background-color: #182030; border-radius: 6px; cursor: pointer; transition: background-color 0.2s; }
+    .bar:nth-child(1) { height: 12px; }
+    .bar:nth-child(2) { height: 18px; }
+    .bar:nth-child(3) { height: 26px; }
+    .bar:nth-child(4) { height: 36px; }
+    .bar.active { background-color: #26e6a3; }
+    .auto-disabled { pointer-events: none; opacity: 0.6; }
+    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.65rem; font-weight: bold; background: #ef4444; color: white; margin-bottom: 8px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div id="status" class="status-badge">Menghubungkan...</div>
-    <h2>Smart AC Remote</h2>
 
-    <div class="sensor-grid">
-      <div class="sensor-card">
-        <div class="lbl">Suhu Realtime</div>
-        <span class="val" id="temp">--</span> °C
-      </div>
-      <div class="sensor-card">
-        <div class="lbl">Kelembapan</div>
-        <span class="val" id="hum">--</span> %
+  <div class="dashboard">
+    <div style="text-align: center;"><span id="mqttStatus" class="status-badge">DISCONNECTED</span></div>
+
+    <!-- Mode System -->
+    <div class="card mode-card">
+      <div class="label-sm">System Mode</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="btnManual" onclick="setSystemMode('manual')">MANUAL</button>
+        <button class="mode-btn" id="btnAuto" onclick="setSystemMode('auto')">AUTO</button>
       </div>
     </div>
 
-    <p>Mode: <b id="mode-text" style="color:#38bdf8">--</b></p>
-    <button class="btn btn-mode" onclick="sendCmd('TOGGLE_AUTO')">Ganti Auto / Manual</button>
-
-    <div class="temp-ctrl">
-      <button class="btn-circle" onclick="changeTemp(-1)">-</button>
-      <span style="font-size:36px; font-weight:bold; width:60px;" id="target-temp">24</span>°C
-      <button class="btn-circle" onclick="changeTemp(1)">+</button>
+    <!-- Room Temp -->
+    <div class="card room-temp-card">
+      <div class="label-sm">Room Temperature</div>
+      <div class="temp-val-main" id="roomTempDisplay">--</div>
+      <div class="temp-range">
+        <span>16°</span>
+        <span>°C</span>
+        <span>30°</span>
+      </div>
     </div>
 
-    <button class="btn btn-on" onclick="sendCmd('ON')">NYALAKAN AC</button>
-    <button class="btn btn-off" onclick="sendCmd('OFF')">MATIKAN AC</button>
-
-    <!-- GRAFIK RIWAYAT 30 HARI -->
-    <div class="chart-container">
-      <div class="lbl" style="margin-bottom:10px;">Riwayat Suhu (30 Hari Terakhir)</div>
-      <canvas id="historyChart"></canvas>
+    <!-- Humidity -->
+    <div class="card humidity-card">
+      <div class="label-sm">Humidity</div>
+      <div class="humidity-val" id="humidityDisplay">--%</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="humidityProgress"></div>
+      </div>
     </div>
+
+    <!-- History Chart Card -->
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div class="label-sm">History Log</div>
+        <div class="chart-controls">
+          <div class="chart-tabs">
+            <button class="tab-btn active" id="tabToday" onclick="switchChartRange('today')">HARI INI</button>
+            <button class="tab-btn" id="tab30Days" onclick="switchChartRange('30days')">30 HARI</button>
+          </div>
+          <button class="btn-download" onclick="downloadHistoryCSV()" title="Download CSV 30 Hari">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            CSV
+          </button>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="historyChart"></canvas>
+      </div>
+    </div>
+
+    <!-- AC Status -->
+    <div class="card status-card">
+      <div class="label-sm">AC Status</div>
+      <div class="status-item">
+        <div class="status-info">
+          <span class="dot-led active" id="sumDot1"></span>
+          <span>AC Unit 1</span>
+        </div>
+        <span class="amps-green" id="statusAmp1">0.0 A</span>
+      </div>
+      <div class="status-item">
+        <div class="status-info">
+          <span class="dot-led active" id="sumDot2"></span>
+          <span>AC Unit 2</span>
+        </div>
+        <span class="amps-green" id="statusAmp2">0.0 A</span>
+      </div>
+    </div>
+
+    <div class="section-header" id="sectionHeader">AIR CONDITIONING · 2/2 ACTIVE</div>
+
+    <!-- AC Unit 1 -->
+    <div class="card ac-card" id="cardUnit1">
+      <div class="ac-header">
+        <div>
+          <div class="ac-title">AC Unit 1</div>
+          <div class="ac-sub">
+            <span class="dot-led active" id="u1Dot"></span>
+            <span id="u1StateText">ACTIVE · <span id="u1Amp">0.0</span> A</span>
+          </div>
+        </div>
+        <div class="power-btn-container">
+          <button class="push-btn push-btn-on pressed" id="u1BtnOn" onclick="toggleUnit(1, true)">ON</button>
+          <button class="push-btn push-btn-off" id="u1BtnOff" onclick="toggleUnit(1, false)">OFF</button>
+        </div>
+      </div>
+
+      <div class="temp-control-row">
+        <div class="temp-box">
+          <div class="label-sm">Room</div>
+          <div class="temp-val uRoomTemp">--°</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="temp-box">
+          <div class="label-sm">Target</div>
+          <div class="target-control">
+            <button class="btn-step" onclick="changeTarget(1, -1)">-</button>
+            <span class="temp-val target-green" id="u1Target">22°</span>
+            <button class="btn-step" onclick="changeTarget(1, 1)">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="fan-header">
+          <span class="label-sm">Fan</span>
+          <span class="label-sm target-green" id="u1FanText" style="text-transform: none;">High</span>
+        </div>
+        <div class="fan-bars" id="u1FanBars">
+          <div class="bar active" onclick="setFan(1, 1)"></div>
+          <div class="bar active" onclick="setFan(1, 2)"></div>
+          <div class="bar active" onclick="setFan(1, 3)"></div>
+          <div class="bar" onclick="setFan(1, 4)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC Unit 2 -->
+    <div class="card ac-card" id="cardUnit2">
+      <div class="ac-header">
+        <div>
+          <div class="ac-title">AC Unit 2</div>
+          <div class="ac-sub">
+            <span class="dot-led active" id="u2Dot"></span>
+            <span id="u2StateText">ACTIVE · <span id="u2Amp">0.0</span> A</span>
+          </div>
+        </div>
+        <div class="power-btn-container">
+          <button class="push-btn push-btn-on pressed" id="u2BtnOn" onclick="toggleUnit(2, true)">ON</button>
+          <button class="push-btn push-btn-off" id="u2BtnOff" onclick="toggleUnit(2, false)">OFF</button>
+        </div>
+      </div>
+
+      <div class="temp-control-row">
+        <div class="temp-box">
+          <div class="label-sm">Room</div>
+          <div class="temp-val uRoomTemp">--°</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="temp-box">
+          <div class="label-sm">Target</div>
+          <div class="target-control">
+            <button class="btn-step" onclick="changeTarget(2, -1)">-</button>
+            <span class="temp-val target-green" id="u2Target">22°</span>
+            <button class="btn-step" onclick="changeTarget(2, 1)">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="fan-header">
+          <span class="label-sm">Fan</span>
+          <span class="label-sm target-green" id="u2FanText" style="text-transform: none;">High</span>
+        </div>
+        <div class="fan-bars" id="u2FanBars">
+          <div class="bar active" onclick="setFan(2, 1)"></div>
+          <div class="bar active" onclick="setFan(2, 2)"></div>
+          <div class="bar active" onclick="setFan(2, 3)"></div>
+          <div class="bar" onclick="setFan(2, 4)"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-<script>
-  let targetTemp = 24;
-  const TOPIC_PREFIX = "kamar_saya_99";
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzlayNGFPBlf-QwivX-EkjMRnxnkz002XtVbgf4sJ2_g3gBGBT0n1_q5QgQb59HfbUleQ/exec";
+  <script>
+    let systemMode = 'manual';
+    let chartInstance = null;
+    const TOPIC_PREFIX = "kamar_saya_99";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzlayNGFPBlf-QwivX-EkjMRnxnkz002XtVbgf4sJ2_g3gBGBT0n1_q5QgQb59HfbUleQ/exec";
 
-  // 1. MQTT Client (Realtime Remote)
-  const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+    const state = {
+      unit1: { target: 22, fan: 3, active: true },
+      unit2: { target: 22, fan: 3, active: true }
+    };
 
-  client.on('connect', () => {
-    document.getElementById('status').innerText = 'Terhubung (Cloud)';
-    document.getElementById('status').style.background = '#22c55e';
-    client.subscribe(TOPIC_PREFIX + '/ac/suhu');
-    client.subscribe(TOPIC_PREFIX + '/ac/kelembapan');
-    client.subscribe(TOPIC_PREFIX + '/ac/mode');
-  });
+    const fanLabels = ["Low", "Med", "High", "Max"];
 
-  client.on('message', (topic, message) => {
-    const val = message.toString();
-    if (topic === TOPIC_PREFIX + '/ac/suhu') document.getElementById('temp').innerText = val;
-    if (topic === TOPIC_PREFIX + '/ac/kelembapan') document.getElementById('hum').innerText = val;
-    if (topic === TOPIC_PREFIX + '/ac/mode') document.getElementById('mode-text').innerText = val;
-  });
+    let chartDataToday = { labels: [], temp: [], amp: [] };
+    let chartData30Days = { labels: [], temp: [], amp: [] };
 
-  function sendCmd(cmd) { client.publish(TOPIC_PREFIX + '/ac/command', cmd); }
-  function changeTemp(delta) {
-    targetTemp += delta;
-    if(targetTemp < 16) targetTemp = 16;
-    if(targetTemp > 30) targetTemp = 30;
-    document.getElementById('target-temp').innerText = targetTemp;
-    client.publish(TOPIC_PREFIX + '/ac/target_suhu', targetTemp.toString());
-  }
+    // --- MQTT EMQX ---
+    const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
-  // 2. Load History dari Google Sheets
-  async function loadHistoryChart() {
-    try {
-      const res = await fetch(GOOGLE_SCRIPT_URL + "?action=read");
-      const data = await res.json();
+    client.on('connect', () => {
+      const statusElem = document.getElementById('mqttStatus');
+      statusElem.innerText = "CONNECTED (EMQX)";
+      statusElem.style.background = "#10b981";
+      client.subscribe(TOPIC_PREFIX + '/ac/#');
+    });
 
-      const labels = data.map(item => item.timestamp);
-      const temps = data.map(item => item.temp);
+    client.on('message', (topic, message) => {
+      const val = message.toString();
+      
+      if (topic === TOPIC_PREFIX + '/ac/suhu') {
+        document.getElementById('roomTempDisplay').innerText = val;
+        document.querySelectorAll('.uRoomTemp').forEach(e => e.innerText = val + '°');
+      }
+      if (topic === TOPIC_PREFIX + '/ac/kelembapan') {
+        document.getElementById('humidityDisplay').innerText = val + '%';
+        document.getElementById('humidityProgress').style.width = val + '%';
+      }
+      if (topic === TOPIC_PREFIX + '/ac/amp1') {
+        document.getElementById('statusAmp1').innerText = val + ' A';
+        document.getElementById('u1Amp').innerText = val;
+      }
+      if (topic === TOPIC_PREFIX + '/ac/amp2') {
+        document.getElementById('statusAmp2').innerText = val + ' A';
+        document.getElementById('u2Amp').innerText = val;
+      }
+      if (topic === TOPIC_PREFIX + '/ac/mode') {
+        setSystemModeUI(val.toLowerCase());
+      }
+    });
 
+    window.onload = function() {
+      initChart({ labels: [], temp: [], amp: [] });
+      loadHistoryFromGoogleSheets();
+    };
+
+    function initChart(data) {
       const ctx = document.getElementById('historyChart').getContext('2d');
-      new Chart(ctx, {
+      chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: labels,
-          datasets: [{
-            label: 'Suhu (°C)',
-            data: temps,
-            borderColor: '#38bdf8',
-            backgroundColor: 'rgba(56, 189, 248, 0.1)',
-            fill: true,
-            tension: 0.3
-          }]
+          labels: data.labels,
+          datasets: [
+            { label: 'Suhu (°C)', data: data.temp, borderColor: '#26e6a3', backgroundColor: 'rgba(38, 230, 163, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yTemp' },
+            { label: 'Arus (A)', data: data.amp, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yAmp' }
+          ]
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#5a6e85', font: { size: 10 } } } },
           scales: {
-            x: { ticks: { color: '#94a3b8', maxRotation: 45 } },
-            y: { ticks: { color: '#94a3b8' } }
-          },
-          plugins: { legend: { display: false } }
+            x: { ticks: { color: '#5a6e85', font: { size: 9 } }, grid: { color: '#1a2333' } },
+            yTemp: { type: 'linear', position: 'left', ticks: { color: '#26e6a3', font: { size: 9 } }, grid: { color: '#1a2333' } },
+            yAmp: { type: 'linear', position: 'right', ticks: { color: '#3b82f6', font: { size: 9 } }, grid: { drawOnChartArea: false } }
+          }
         }
       });
-    } catch (e) {
-      console.error("Gagal memuat riwayat grafik:", e);
     }
-  }
 
-  loadHistoryChart();
-</script>
+    async function loadHistoryFromGoogleSheets() {
+      try {
+        const res = await fetch(GOOGLE_SCRIPT_URL + "?action=read");
+        const data = await res.json();
+
+        chartData30Days.labels = data.map(i => i.timestamp);
+        chartData30Days.temp = data.map(i => i.temp);
+        chartData30Days.amp = data.map(i => i.amp || 0);
+
+        chartDataToday.labels = chartData30Days.labels.slice(-10);
+        chartDataToday.temp = chartData30Days.temp.slice(-10);
+        chartDataToday.amp = chartData30Days.amp.slice(-10);
+
+        updateChartData(chartDataToday);
+      } catch(e) {
+        console.error("Gagal load history:", e);
+      }
+    }
+
+    function switchChartRange(range) {
+      const btnToday = document.getElementById('tabToday');
+      const btn30Days = document.getElementById('tab30Days');
+
+      if (range === 'today') {
+        btnToday.classList.add('active');
+        btn30Days.classList.remove('active');
+        updateChartData(chartDataToday);
+      } else {
+        btn30Days.classList.add('active');
+        btnToday.classList.remove('active');
+        updateChartData(chartData30Days);
+      }
+    }
+
+    function updateChartData(newData) {
+      chartInstance.data.labels = newData.labels;
+      chartInstance.data.datasets[0].data = newData.temp;
+      chartInstance.data.datasets[1].data = newData.amp;
+      chartInstance.update();
+    }
+
+    function downloadHistoryCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,Tanggal,Suhu Ruangan (C),Arus Total (A)\n";
+      chartData30Days.labels.forEach((label, index) => {
+        csvContent += `${label},${chartData30Days.temp[index]},${chartData30Days.amp[index]}\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "AC_History_30_Hari.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function setSystemMode(mode) {
+      client.publish(TOPIC_PREFIX + '/ac/command', mode === 'auto' ? 'MODE_AUTO' : 'MODE_MANUAL');
+      setSystemModeUI(mode);
+    }
+
+    function setSystemModeUI(mode) {
+      systemMode = mode;
+      const btnManual = document.getElementById('btnManual');
+      const btnAuto = document.getElementById('btnAuto');
+      const cardUnit1 = document.getElementById('cardUnit1');
+      const cardUnit2 = document.getElementById('cardUnit2');
+
+      if (mode === 'auto' || mode === 'otomatis') {
+        btnAuto.classList.add('active');
+        btnManual.classList.remove('active');
+        cardUnit1.classList.add('auto-disabled');
+        cardUnit2.classList.add('auto-disabled');
+      } else {
+        btnManual.classList.add('active');
+        btnAuto.classList.remove('active');
+        cardUnit1.classList.remove('auto-disabled');
+        cardUnit2.classList.remove('auto-disabled');
+      }
+    }
+
+    function changeTarget(unit, delta) {
+      if (systemMode === 'auto') return;
+      const u = unit === 1 ? state.unit1 : state.unit2;
+      if (!u.active) return;
+      u.target = Math.min(30, Math.max(16, u.target + delta));
+      document.getElementById(`u${unit}Target`).innerText = u.target + '°';
+      client.publish(TOPIC_PREFIX + `/ac/u${unit}/target`, u.target.toString());
+    }
+
+    function setFan(unit, level) {
+      const u = unit === 1 ? state.unit1 : state.unit2;
+      if (!u.active && systemMode !== 'auto') return;
+      u.fan = level;
+      
+      document.getElementById(`u${unit}FanText`).innerText = fanLabels[level - 1];
+      const bars = document.querySelectorAll(`#u${unit}FanBars .bar`);
+      bars.forEach((bar, idx) => {
+        if (idx < level) bar.classList.add('active');
+        else bar.classList.remove('active');
+      });
+
+      client.publish(TOPIC_PREFIX + `/ac/u${unit}/fan`, level.toString());
+    }
+
+    function toggleUnit(unit, isTurnOn) {
+      if (systemMode === 'auto' && !isTurnOn) return;
+
+      const u = unit === 1 ? state.unit1 : state.unit2;
+      u.active = isTurnOn;
+      
+      const card = document.getElementById(`cardUnit${unit}`);
+      const sumDot = document.getElementById(`sumDot${unit}`);
+      const uDot = document.getElementById(`u${unit}Dot`);
+      const statusAmp = document.getElementById(`statusAmp${unit}`);
+      const uStateText = document.getElementById(`u${unit}StateText`);
+      
+      consst btnOn = document.getElementById(`u${unit}BtnOn`);
+      const btnOff = document.getElementById(`u${unit}BtnOff`);
+
+      if (isTurnOn) {
+        card.classList.remove('unit-off');
+        sumDot.className = 'dot-led active';
+        uDot.className = 'dot-led active';
+        statusAmp.className = 'amps-green';
+        uStateText.innerHTML = 'ACTIVE · <span id="u' + unit + 'Amp">0.0</span> A';
+
+        btnOn.classList.add('pressed');
+        btnOff.classList.remove('pressed');
+      } else {
+        card.classList.add('unit-off');
+        sumDot.className = 'dot-led off';
+        uDot.className = 'dot-led off';
+        statusAmp.innerText = '0.0 A';
+        statusAmp.className = 'amps-off';
+        uStateText.innerHTML = 'OFF · 0.0 A';
+
+        btnOff.classList.add('pressed');
+        btnOn.classList.pressed = true;
+      }
+
+      const activeCount = (state.unit1.active ? 1 : 0) + (state.unit2.active ? 1 : 0);
+      document.getElementById('sectionHeader').innerText = `AIR CONDITIONING · ${activeCount}/2 ACTIVE`;
+
+      client.publish(TOPIC_PREFIX + `/ac/u${unit}/pwr`, isTurnOn ? "ON" : "OFF");
+    }
+  </script>
 </body>
 </html>
