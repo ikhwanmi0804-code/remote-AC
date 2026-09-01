@@ -254,19 +254,32 @@
     let chartDataToday = { labels: [], temp: [], amp: [] };
     let chartData30Days = { labels: [], temp: [], amp: [] };
 
-    // --- KONEKSI MQTT VIA WEBSOCKET (EMQX) ---
-    const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+    // --- KONEKSI MQTT VIA WEBSOCKET (HIVEMQ CLOUD) ---
+    const options = {
+      host: '023318a218b244efa7e7e8e1c53d1cf2.s1.eu.hivemq.cloud',
+      port: 8884,                  // Port khusus WebSocket TLS HiveMQ Cloud
+      protocol: 'wss',             // WebSocket Secure
+      path: '/mqtt',
+      username: 'USERNAME_HIVEMQ_KAMU', // Ganti dengan Username dari Access Management
+      password: 'PASSWORD_HIVEMQ_KAMU', // Ganti dengan Password dari Access Management
+      clientId: 'WebDashboard_' + Math.random().toString(16).substr(2, 8)
+    };
+
+    const client = mqtt.connect(options);
 
     client.on('connect', () => {
-      console.log("MQTT Connected!");
+      console.log("MQTT Connected to HiveMQ Cloud!");
       const statusElem = document.getElementById('mqttStatus');
-      statusElem.innerText = "CONNECTED (EMQX)";
+      statusElem.innerText = "CONNECTED (HIVEMQ)";
       statusElem.style.background = "#10b981";
       client.subscribe(TOPIC_PREFIX + '/ac/#');
     });
 
     client.on('error', (err) => {
       console.error("MQTT Error: ", err);
+      const statusElem = document.getElementById('mqttStatus');
+      statusElem.innerText = "ERROR CONNECTING";
+      statusElem.style.background = "#ef4444";
     });
 
     client.on('message', (topic, message) => {
