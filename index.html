@@ -255,17 +255,16 @@
     let chartData30Days = { labels: [], temp: [], amp: [] };
 
     // --- KONEKSI MQTT VIA WEBSOCKET (HIVEMQ CLOUD) ---
+    const mqttUrl = 'wss://023318a218b244efa7e7e8e1c53d1cf2.s1.eu.hivemq.cloud:8884/mqtt';
+    
     const options = {
-      host: '023318a218b244efa7e7e8e1c53d1cf2.s1.eu.hivemq.cloud',
-      port: 8884,                  // Port khusus WebSocket TLS HiveMQ Cloud
-      protocol: 'wss',             // WebSocket Secure
-      path: '/mqtt',
-      username: 'ikhwan', // Ganti dengan Username dari Access Management
-      password: '12345678', // Ganti dengan Password dari Access Management
-      clientId: 'WebDashboard_' + Math.random().toString(16).substr(2, 8)
+      username: 'ikhwan',
+      password: '12345678',
+      clientId: 'WebDashboard_' + Math.random().toString(16).substr(2, 8),
+      clean: true
     };
 
-    const client = mqtt.connect(options);
+    const client = mqtt.connect(mqttUrl, options);
 
     client.on('connect', () => {
       console.log("MQTT Connected to HiveMQ Cloud!");
