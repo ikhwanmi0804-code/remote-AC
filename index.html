@@ -251,8 +251,8 @@
     };
 
     const fanLabels = ["Low", "Med", "High", "Max"];
-    let chartDataToday = { labels: [], temp: [], amp: [] };
-    let chartData30Days = { labels: [], temp: [], amp: [] };
+    let chartDataToday = { labels: [], temp: [], amp1: [], amp2: [] };
+    let chartData30Days = { labels: [], temp: [], amp1: [], amp2: [] };
 
     // --- KONEKSI MQTT VIA WEBSOCKET (HIVEMQ CLOUD) ---
     const mqttUrl = 'wss://023318a218b244efa7e7e8e1c53d1cf2.s1.eu.hivemq.cloud:8884/mqtt';
@@ -306,7 +306,7 @@
     });
 
     window.onload = function() {
-      initChart({ labels: [], temp: [], amp: [] });
+      initChart({ labels: [], temp: [], amp1: [], amp2: [] });
       loadHistoryFromGoogleSheets();
     };
 
@@ -318,13 +318,14 @@
           labels: data.labels,
           datasets: [
             { label: 'Suhu (°C)', data: data.temp, borderColor: '#26e6a3', backgroundColor: 'rgba(38, 230, 163, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yTemp' },
-            { label: 'Arus (A)', data: data.amp, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yAmp' }
+            { label: 'Arus AC1 (A)', data: data.amp1, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yAmp' },
+            { label: 'Arus AC2 (A)', data: data.amp2, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yAmp' }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#5a6e85', font: { size: 10 } } } },
+          plugins: { legend: { labels: { color: '#5a6e85', font: { size: 9 } } } },
           scales: {
             x: { ticks: { color: '#5a6e85', font: { size: 9 } }, grid: { color: '#1a2333' } },
             yTemp: { type: 'linear', position: 'left', ticks: { color: '#26e6a3', font: { size: 9 } }, grid: { color: '#1a2333' } },
@@ -341,11 +342,13 @@
 
         chartData30Days.labels = data.map(i => i.timestamp);
         chartData30Days.temp = data.map(i => i.temp);
-        chartData30Days.amp = data.map(i => i.amp || 0);
+        chartData30Days.amp1 = data.map(i => i.amp1 || 0);
+        chartData30Days.amp2 = data.map(i => i.amp2 || 0);
 
         chartDataToday.labels = chartData30Days.labels.slice(-10);
         chartDataToday.temp = chartData30Days.temp.slice(-10);
-        chartDataToday.amp = chartData30Days.amp.slice(-10);
+        chartDataToday.amp1 = chartData30Days.amp1.slice(-10);
+        chartDataToday.amp2 = chartData30Days.amp2.slice(-10);
 
         updateChartData(chartDataToday);
       } catch(e) {
@@ -372,14 +375,15 @@
       if(!chartInstance) return;
       chartInstance.data.labels = newData.labels;
       chartInstance.data.datasets[0].data = newData.temp;
-      chartInstance.data.datasets[1].data = newData.amp;
+      chartInstance.data.datasets[1].data = newData.amp1;
+      chartInstance.data.datasets[2].data = newData.amp2;
       chartInstance.update();
     }
 
     function downloadHistoryCSV() {
-      let csvContent = "data:text/csv;charset=utf-8,Tanggal,Suhu Ruangan (C),Arus Total (A)\n";
+      let csvContent = "data:text/csv;charset=utf-8,Tanggal,Suhu Ruangan (C),Arus AC 1 (A),Arus AC 2 (A)\n";
       chartData30Days.labels.forEach((label, index) => {
-        csvContent += `${label},${chartData30Days.temp[index]},${chartData30Days.amp[index]}\n`;
+        csvContent += `${label},${chartData30Days.temp[index]},${chartData30Days.amp1[index]},${chartData30Days.amp2[index]}\n`;
       });
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
