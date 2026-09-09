@@ -317,9 +317,9 @@
         data: {
           labels: data.labels,
           datasets: [
-            { label: 'Suhu (°C)', data: data.temp, borderColor: '#26e6a3', backgroundColor: 'rgba(38, 230, 163, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yTemp' },
-            { label: 'Arus AC1 (A)', data: data.amp1, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yAmp' },
-            { label: 'Arus AC2 (A)', data: data.amp2, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yAmp' }
+            { label: 'Suhu (°C)', data: data.temp, borderColor: '#26e6a3', backgroundColor: 'rgba(38, 230, 163, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yTemp',pointRadius: 0,pointHoverRadius: 0},
+            { label: 'Arus AC1 (A)', data: data.amp1, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yAmp',pointRadius: 0,pointHoverRadius: 0},
+            { label: 'Arus AC2 (A)', data: data.amp2, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'yAmp',pointRadius: 0,pointHoverRadius: 0}
           ]
         },
         options: {
