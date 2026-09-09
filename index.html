@@ -308,14 +308,19 @@
         document.getElementById('humidityDisplay').innerText = val + '%';
         document.getElementById('humidityProgress').style.width = val + '%';
       }
+      
+      // Update bacaan riil sensor ampere secara terpisah tanpa syarat tombol
       if (topic === TOPIC_PREFIX + '/ac/amp1') {
         document.getElementById('statusAmp1').innerText = val + ' A';
-        document.getElementById('u1Amp').innerText = val;
+        const u1Elem = document.getElementById('u1Amp');
+        if (u1Elem) u1Elem.innerText = val;
       }
       if (topic === TOPIC_PREFIX + '/ac/amp2') {
         document.getElementById('statusAmp2').innerText = val + ' A';
-        document.getElementById('u2Amp').innerText = val;
+        const u2Elem = document.getElementById('u2Amp');
+        if (u2Elem) u2Elem.innerText = val;
       }
+      
       if (topic === TOPIC_PREFIX + '/ac/mode') {
         setSystemModeUI(val.toLowerCase());
       }
@@ -341,7 +346,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yTemp',
-              pointRadius: 0,      // Menghilangkan bulatan titik
+              pointRadius: 0,      // Garis murni tanpa bulatan
               pointHoverRadius: 0
             },
             { 
@@ -352,7 +357,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yAmp',
-              pointRadius: 0,      // Menghilangkan bulatan titik
+              pointRadius: 0,      // Garis murni tanpa bulatan
               pointHoverRadius: 0
             },
             { 
@@ -363,7 +368,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yAmp',
-              pointRadius: 0,      // Menghilangkan bulatan titik
+              pointRadius: 0,      // Garis murni tanpa bulatan
               pointHoverRadius: 0
             }
           ]
@@ -517,9 +522,9 @@
         card.classList.add('unit-off');
         sumDot.className = 'dot-led off';
         uDot.className = 'dot-led off';
-        statusAmp.innerText = '0.0 A';
         statusAmp.className = 'amps-off';
-        uStateText.innerHTML = 'OFF · 0.0 A';
+        // Teks berubah jadi OFF, tapi elemen span ampere tetep dipertahankan
+        uStateText.innerHTML = 'OFF · <span id="u' + unit + 'Amp">0.0</span> A';
 
         btnOff.classList.add('pressed');
         btnOn.classList.remove('pressed');
