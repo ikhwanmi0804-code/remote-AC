@@ -256,7 +256,7 @@
 
     const fanLabels = ["Low", "Med", "High", "Max"];
     let chartDataToday = { labels: [], temp: [], amp1: [], amp2: [] };
-    let chartData30Days = { labels: [], fullDates: [], temp: [], amp1: [], amp2: [] };
+    let chartData30Days = { labels: [], temp: [], amp1: [], amp2: [] };
 
     // --- KONEKSI MQTT VIA WEBSOCKET (HIVEMQ CLOUD) ---
     const mqttUrl = 'wss://023318a218b244efa7e7e8e1c53d1cf2.s1.eu.hivemq.cloud:8884/mqtt';
@@ -288,6 +288,7 @@
     client.on('message', (topic, message) => {
       const val = message.toString();
       
+      // Indikator Status Koneksi Hardware ESP32
       if (topic === TOPIC_PREFIX + '/ac/status') {
         const espElem = document.getElementById('espStatus');
         if (val === 'ONLINE') {
@@ -308,6 +309,7 @@
         document.getElementById('humidityProgress').style.width = val + '%';
       }
       
+      // Update bacaan riil sensor ampere secara terpisah tanpa syarat tombol
       if (topic === TOPIC_PREFIX + '/ac/amp1') {
         document.getElementById('statusAmp1').innerText = val + ' A';
         const u1Elem = document.getElementById('u1Amp');
@@ -344,7 +346,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yTemp',
-              pointRadius: 0,
+              pointRadius: 0,      // Garis murni tanpa bulatan
               pointHoverRadius: 0
             },
             { 
@@ -355,7 +357,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yAmp',
-              pointRadius: 0,
+              pointRadius: 0,      // Garis murni tanpa bulatan
               pointHoverRadius: 0
             },
             { 
@@ -366,7 +368,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yAmp',
-              pointRadius: 0,
+              pointRadius: 0,      // Garis murni tanpa bulatan
               pointHoverRadius: 0
             }
           ]
@@ -390,7 +392,6 @@
         const data = await res.json();
 
         chartData30Days.labels = data.map(i => i.timestamp);
-        chartData30Days.fullDates = data.map(i => i.fullDate || i.timestamp);
         chartData30Days.temp = data.map(i => parseFloat(String(i.temp).replace(",", ".")) || 0);
         chartData30Days.amp1 = data.map(i => parseFloat(String(i.amp1).replace(",", ".")) || 0);
         chartData30Days.amp2 = data.map(i => parseFloat(String(i.amp2).replace(",", ".")) || 0);
@@ -431,15 +432,14 @@
     }
 
     function downloadHistoryCSV() {
-      let csvContent = "data:text/csv;charset=utf-8,Tanggal & Waktu,Suhu Ruangan (C),Arus AC 1 (A),Arus AC 2 (A)\n";
+      let csvContent = "data:text/csv;charset=utf-8,Tanggal,Suhu Ruangan (C),Arus AC 1 (A),Arus AC 2 (A)\n";
       chartData30Days.labels.forEach((label, index) => {
-        const fullDateStr = chartData30Days.fullDates ? chartData30Days.fullDates[index] : label;
-        csvContent += `"${fullDateStr}",${chartData30Days.temp[index]},${chartData30Days.amp1[index]},${chartData30Days.amp2[index]}\n`;
+        csvContent += `${label},${chartData30Days.temp[index]},${chartData30Days.amp1[index]},${chartData30Days.amp2[index]}\n`;
       });
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `AC_History_30_Hari_${new Date().toISOString().slice(0,10)}.csv`);
+      link.setAttribute("download", "AC_History_30_Hari.csv");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -523,6 +523,7 @@
         sumDot.className = 'dot-led off';
         uDot.className = 'dot-led off';
         statusAmp.className = 'amps-off';
+        // Teks berubah jadi OFF, tapi elemen span ampere tetep dipertahankan
         uStateText.innerHTML = 'OFF · <span id="u' + unit + 'Amp">0.0</span> A';
 
         btnOff.classList.add('pressed');
