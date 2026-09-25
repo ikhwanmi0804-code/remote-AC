@@ -342,15 +342,15 @@
         document.getElementById('roomTempDisplay').innerText = val;
         document.querySelectorAll('.uRoomTemp').forEach(e => e.innerText = val + '°');
         
-        // Notifikasi Peringatan Suhu Ekstrem
+        // Notifikasi Peringatan Suhu Ekstrem (Batas 30°C dan 28°C)
         let currentTemp = parseFloat(val);
-        if (currentTemp >= 22.0 && lastNotifyState.temp !== 'PANAS') {
+        if (currentTemp >= 30.0 && lastNotifyState.temp !== 'PANAS') {
           lastNotifyState.temp = 'PANAS';
           sendNotification("Peringatan Suhu", `Suhu Ruangan Panas (${val}°C)!`, "#f59e0b");
-        } else if (currentTemp <= 17.0 && lastNotifyState.temp !== 'DINGIN') {
+        } else if (currentTemp <= 28.0 && lastNotifyState.temp !== 'DINGIN') {
           lastNotifyState.temp = 'DINGIN';
-          sendNotification("Info Suhu", `Suhu Ruangan Dingin (${val}°C).`, "#3b82f6");
-        } else if (currentTemp > 17.0 && currentTemp < 22.0) {
+          sendNotification("Info Suhu", `Suhu Ruangan Sejuk (${val}°C).`, "#3b82f6");
+        } else if (currentTemp > 28.0 && currentTemp < 30.0) {
           lastNotifyState.temp = 'NORMAL';
         }
       }
