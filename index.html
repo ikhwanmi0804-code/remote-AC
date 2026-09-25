@@ -7,6 +7,11 @@
   <!-- Library MQTT & Chart.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Library ToastifyJS untuk Notifikasi Visual (In-App Toast) -->
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
     body { background-color: #0b0e14; color: #ffffff; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
@@ -246,6 +251,8 @@
   <script>
     let systemMode = 'manual';
     let chartInstance = null;
+    let lastNotifyState = { temp: null, mode: null, u1Power: null, u2Power: null };
+    
     const TOPIC_PREFIX = "kamar_saya_99";
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzg6BGjS2vVzCIDzMe9V3RUnz8sD5eR6zxUqtz08N2tzmUTftSqWOzOj7CsNeYabtlbw/exec";
 
@@ -257,6 +264,31 @@
     const fanLabels = ["Low", "Med", "High", "Max"];
     let chartDataToday = { labels: [], temp: [], amp1: [], amp2: [] };
     let chartData30Days = { labels: [], temp: [], amp1: [], amp2: [] };
+
+    // --- FUNGSI MENGIRIM NOTIFIKASI WEB & TOAST ---
+    function sendNotification(title, message, color = "#26e6a3") {
+      // 1. In-App Toast Notification (Muncul di layar web)
+      Toastify({
+        text: `📢 ${title}: ${message}`,
+        duration: 4000,
+        gravity: "top",
+        position: "right",
+        style: {
+          background: color,
+          color: "#0b0e14",
+          fontWeight: "bold",
+          borderRadius: "10px"
+        }
+      }).showToast();
+
+      // 2. System Browser Notification (Popup OS/HP)
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, {
+          body: message,
+          icon: "https://cdn-icons-png.flaticon.com/512/1684/1684375.png"
+        });
+      }
+    }
 
     // --- KONEKSI MQTT VIA WEBSOCKET (HIVEMQ CLOUD) ---
     const mqttUrl = 'wss://023318a218b244efa7e7e8e1c53d1cf2.s1.eu.hivemq.cloud:8884/mqtt';
@@ -276,6 +308,11 @@
       statusElem.innerText = "MQTT: CONNECTED";
       statusElem.style.background = "#10b981";
       client.subscribe(TOPIC_PREFIX + '/ac/#');
+      
+      // Minta Izin Notifikasi Browser saat pertama kali terhubung
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
     });
 
     client.on('error', (err) => {
@@ -297,13 +334,27 @@
         } else {
           espElem.innerText = "ESP32 OFFLINE";
           espElem.style.background = "#ef4444";
+          sendNotification("Sistem AC", "ESP32 Terputus / OFFLINE!", "#f43f5e");
         }
       }
 
       if (topic === TOPIC_PREFIX + '/ac/suhu') {
         document.getElementById('roomTempDisplay').innerText = val;
         document.querySelectorAll('.uRoomTemp').forEach(e => e.innerText = val + '°');
+        
+        // Notifikasi Peringatan Suhu Ekstrem
+        let currentTemp = parseFloat(val);
+        if (currentTemp >= 22.0 && lastNotifyState.temp !== 'PANAS') {
+          lastNotifyState.temp = 'PANAS';
+          sendNotification("Peringatan Suhu", `Suhu Ruangan Panas (${val}°C)!`, "#f59e0b");
+        } else if (currentTemp <= 17.0 && lastNotifyState.temp !== 'DINGIN') {
+          lastNotifyState.temp = 'DINGIN';
+          sendNotification("Info Suhu", `Suhu Ruangan Dingin (${val}°C).`, "#3b82f6");
+        } else if (currentTemp > 17.0 && currentTemp < 22.0) {
+          lastNotifyState.temp = 'NORMAL';
+        }
       }
+
       if (topic === TOPIC_PREFIX + '/ac/kelembapan') {
         document.getElementById('humidityDisplay').innerText = val + '%';
         document.getElementById('humidityProgress').style.width = val + '%';
@@ -323,6 +374,24 @@
       
       if (topic === TOPIC_PREFIX + '/ac/mode') {
         setSystemModeUI(val.toLowerCase());
+        if (lastNotifyState.mode !== val) {
+          lastNotifyState.mode = val;
+          sendNotification("Mode Sistem", `Mode AC diubah ke: ${val.toUpperCase()}`, "#26e6a3");
+        }
+      }
+
+      // Status Power AC 1 & AC 2 dari MQTT
+      if (topic === TOPIC_PREFIX + '/ac/u1/pwr/state') {
+        if (lastNotifyState.u1Power !== val) {
+          lastNotifyState.u1Power = val;
+          sendNotification("AC Unit 1", `AC Unit 1 sekarang ${val}`, val === 'ON' ? "#26e6a3" : "#f43f5e");
+        }
+      }
+      if (topic === TOPIC_PREFIX + '/ac/u2/pwr/state') {
+        if (lastNotifyState.u2Power !== val) {
+          lastNotifyState.u2Power = val;
+          sendNotification("AC Unit 2", `AC Unit 2 sekarang ${val}`, val === 'ON' ? "#26e6a3" : "#f43f5e");
+        }
       }
     });
 
@@ -346,7 +415,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yTemp',
-              pointRadius: 0,      // Garis murni tanpa bulatan
+              pointRadius: 0,
               pointHoverRadius: 0
             },
             { 
@@ -357,7 +426,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yAmp',
-              pointRadius: 0,      // Garis murni tanpa bulatan
+              pointRadius: 0,
               pointHoverRadius: 0
             },
             { 
@@ -368,7 +437,7 @@
               borderWidth: 2, 
               tension: 0.3, 
               yAxisID: 'yAmp',
-              pointRadius: 0,      // Garis murni tanpa bulatan
+              pointRadius: 0,
               pointHoverRadius: 0
             }
           ]
@@ -523,7 +592,6 @@
         sumDot.className = 'dot-led off';
         uDot.className = 'dot-led off';
         statusAmp.className = 'amps-off';
-        // Teks berubah jadi OFF, tapi elemen span ampere tetep dipertahankan
         uStateText.innerHTML = 'OFF · <span id="u' + unit + 'Amp">0.0</span> A';
 
         btnOff.classList.add('pressed');
